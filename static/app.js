@@ -15,8 +15,9 @@ const heatmapGridEl = document.getElementById("heatmap-grid");
 const alertsListEl = document.getElementById("alerts-list");
 const clearAlertsBtn = document.getElementById("clear-alerts-btn");
 
-// Attack Toggle
-const attackToggleBtn = document.getElementById("attack-toggle-btn");
+// Attack controls
+const attackButtons = document.querySelectorAll(".attack-btn");
+const stopAttackBtn = document.getElementById("attack-toggle-btn");
 const systemStatusText = document.getElementById("system-status-text");
 
 // CAN Bus
@@ -24,7 +25,7 @@ const canTableBody = document.getElementById("can-table-body");
 const canRateEl = document.getElementById("can-rate");
 let canHistory = [];
 
-// Timeline canvas
+// Root container
 const rootEl = document.getElementById("app");
 
 // Analytics
@@ -35,7 +36,7 @@ const attackersTableBody = document.getElementById("attackers-table-body");
 
 // State
 let alertHistory = [];
-let attackMode = false;
+let currentAttackMode = null;
 
 // ------------------------- TELEMETRY POLLING -------------------------
 
@@ -46,7 +47,6 @@ async function fetchTelemetry() {
 
     updateDashboard(data);
     systemStatusText.textContent = "Live";
-
   } catch (err) {
     console.error("Telemetry error:", err);
     systemStatusText.textContent = "Error";
@@ -55,7 +55,6 @@ async function fetchTelemetry() {
 
 setInterval(fetchTelemetry, 1000);
 fetchTelemetry();
-
 
 // ------------------------- UPDATE DASHBOARD -------------------------
 
@@ -66,34 +65,34 @@ function updateDashboard(data) {
   brakeStatusEl.style.color =
     data.brake_status === "ON" ? "#f97316" : "#10b981";
 
-  anomalyScoreEl.textContent = data.can_anomaly_score.toFixed(2);
-  anomalyBarFillEl.style.width = `${data.can_anomaly_score * 100}%`;
+  const score = data.can_anomaly_score ?? 0;
+  anomalyScoreEl.textContent = score.toFixed(2);
+  anomalyBarFillEl.style.width = `${Math.min(100, score * 100)}%`;
 
-  lastUpdateEl.textContent = data.timestamp;
+  lastUpdateEl.textContent = data.timestamp || "--";
 
-  // Attack mode UI
+  // Attack styling
   if (data.attack_active) rootEl.classList.add("attack-active");
   else rootEl.classList.remove("attack-active");
 
-  attackMode = data.forced_attack;
-  updateAttackButtonLabel();
+  currentAttackMode = data.attack_mode || null;
+  syncAttackButtons();
 
   // ECU + Heatmap
-  renderEcuHealth(data.ecu_health);
-  renderHeatmap(data.heatmap);
+  renderEcuHealth(data.ecu_health || {});
+  renderHeatmap(data.heatmap || []);
 
   // Alerts
-  if (data.security_alerts.length > 0) {
+  if (data.security_alerts && data.security_alerts.length > 0) {
     addAlerts(data.security_alerts);
   }
 
-  // CAN packets
-  updateCanPackets(data.can_packets);
+  // CAN decoded signals
+  updateCanPackets(data.can_packets || []);
 
   // Timeline
-  updateTimeline(data.can_anomaly_score, data.attack_active);
+  updateTimeline(score, data.attack_active);
 }
-
 
 // ------------------------- ECU HEALTH -------------------------
 
@@ -105,19 +104,16 @@ function renderEcuHealth(ecuHealth) {
 
     const row = document.createElement("div");
     row.className = "ecu-row";
-
     row.innerHTML = `
       <span class="ecu-name">${name}</span>
       <div class="ecu-health-bar">
-          <div class="ecu-health-fill" style="width:${pct}%"></div>
+        <div class="ecu-health-fill" style="width:${pct}%"></div>
       </div>
       <span class="ecu-health-value">${pct}%</span>
     `;
-
     ecuHealthListEl.appendChild(row);
   });
 }
-
 
 // ------------------------- HEATMAP -------------------------
 
@@ -131,7 +127,6 @@ function renderHeatmap(heatmap) {
   });
 }
 
-
 // ------------------------- ALERTS -------------------------
 
 function addAlerts(alerts) {
@@ -142,27 +137,26 @@ function addAlerts(alerts) {
       level: a.level,
       source: a.source,
       message: a.message,
-      time: time,
+      time,
     });
   });
 
   if (alertHistory.length > 50) alertHistory = alertHistory.slice(0, 50);
-
   renderAlerts();
 }
 
 function renderAlerts() {
   alertsListEl.innerHTML = "";
 
-  if (alertHistory.length === 0) {
-    alertsListEl.innerHTML = `<p style="color:#9ca3af;font-size:.85rem;">No alerts yet.</p>`;
+  if (!alertHistory.length) {
+    alertsListEl.innerHTML =
+      '<p style="color:#9ca3af;font-size:.85rem;">No alerts yet.</p>';
     return;
   }
 
   alertHistory.forEach((a) => {
     const div = document.createElement("div");
     div.className = "alert-item";
-
     div.innerHTML = `
       <span class="alert-badge ${a.level}">${a.level}</span>
       <div>
@@ -171,7 +165,6 @@ function renderAlerts() {
       </div>
       <div class="alert-time">${a.time}</div>
     `;
-
     alertsListEl.appendChild(div);
   });
 }
@@ -181,23 +174,21 @@ clearAlertsBtn.addEventListener("click", () => {
   renderAlerts();
 });
 
-
-// ------------------------- CAN BUS LIVE PACKETS -------------------------
+// ------------------------- CAN BUS (DECODED SIGNALS) -------------------------
 
 function updateCanPackets(packets) {
   packets.forEach((pkt) => {
     canHistory.unshift({
-      timestamp: pkt.timestamp,   // FIXED TIMESTAMP FORMAT
-      id: pkt.id,
+      timestamp: pkt.timestamp,
       ecu: pkt.ecu,
-      dlc: pkt.dlc,
-      data: pkt.data,
+      signal: pkt.signal,
+      value: pkt.value,
       anomaly: pkt.anomaly,
     });
   });
 
-  canHistory = canHistory.slice(0, 100);
-  canRateEl.textContent = packets.length + " frames/s";
+  canHistory = canHistory.slice(0, 120);
+  canRateEl.textContent = packets.length + " signals/s";
 
   renderCanTable();
 }
@@ -209,9 +200,10 @@ function renderCanTable() {
     const tr = document.createElement("tr");
     if (f.anomaly) tr.classList.add("can-row-anomaly");
 
-    ["timestamp", "id", "ecu", "dlc", "data"].forEach((k) => {
+    const cols = [f.timestamp, f.ecu, f.signal, f.value];
+    cols.forEach((val) => {
       const td = document.createElement("td");
-      td.textContent = f[k];
+      td.textContent = val;
       tr.appendChild(td);
     });
 
@@ -223,10 +215,11 @@ function renderCanTable() {
   });
 }
 
+// ------------------------- REALTIME NEON TIMELINE -------------------------
 
-// ------------------------- REALTIME TIMELINE (NEON CHART) -------------------------
-
-const timelineCtx = document.getElementById("attackTimelineChart").getContext("2d");
+const timelineCtx = document
+  .getElementById("attackTimelineChart")
+  .getContext("2d");
 
 let anomalyTimeline = [];
 let attackTimeline = [];
@@ -256,23 +249,24 @@ let timelineChart = new Chart(timelineCtx, {
         type: "bar",
         backgroundColor: "rgba(255,0,0,0.18)",
         borderWidth: 0,
-      }
-    ]
+      },
+    ],
   },
   options: {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: { legend: { display: false }},
+    plugins: { legend: { display: false } },
     scales: {
-      x: { ticks: { display: false }, grid: { display: false }},
+      x: { ticks: { display: false }, grid: { display: false } },
       y: {
-        min: 0, max: 1,
+        min: 0,
+        max: 1,
         ticks: { color: "#e5e7eb" },
-        grid: { color: "rgba(100,116,139,0.2)" }
-      }
+        grid: { color: "rgba(100,116,139,0.2)" },
+      },
     },
-    animation: { duration: 350, easing: "easeOutQuart" }
-  }
+    animation: { duration: 350, easing: "easeOutQuart" },
+  },
 });
 
 function updateTimeline(score, attackActive) {
@@ -290,34 +284,56 @@ function updateTimeline(score, attackActive) {
   timelineChart.update();
 }
 
+// ------------------------- ATTACK MODE HANDLING -------------------------
 
-// ------------------------- ATTACK BUTTON -------------------------
-
-function updateAttackButtonLabel() {
-  attackToggleBtn.textContent = attackMode ? "Stop Attack" : "Simulate Attack";
-  attackToggleBtn.style.background = attackMode
-    ? "rgba(239,68,68,0.35)"
-    : "rgba(31,41,55,0.95)";
-}
-
-async function toggleAttackMode() {
-  const newMode = !attackMode;
-  attackMode = newMode;
-  updateAttackButtonLabel();
+async function setAttackMode(mode) {
+  // mode: one of 'flood', 'gps_spoof', ... or null/"off"
+  const payload = { mode: mode || "off" };
 
   try {
-    await fetch("/api/force_attack", {
+    await fetch("/api/attack_mode", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: newMode ? "on" : "off" }),
+      body: JSON.stringify(payload),
     });
+    currentAttackMode = mode || null;
+    syncAttackButtons();
   } catch (err) {
-    console.error("Force attack error:", err);
+    console.error("Failed to set attack mode:", err);
   }
 }
 
-attackToggleBtn.addEventListener("click", toggleAttackMode);
+function syncAttackButtons() {
+  attackButtons.forEach((btn) => {
+    const attack = btn.getAttribute("data-attack");
+    if (attack === currentAttackMode) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
 
+  stopAttackBtn.textContent = currentAttackMode
+    ? "Stop All Attacks"
+    : "No Attack Active";
+}
+
+// Attach click handlers
+attackButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const attack = btn.getAttribute("data-attack");
+    if (currentAttackMode === attack) {
+      // toggle off
+      setAttackMode(null);
+    } else {
+      setAttackMode(attack);
+    }
+  });
+});
+
+stopAttackBtn.addEventListener("click", () => {
+  setAttackMode(null);
+});
 
 // ------------------------- ANALYTICS -------------------------
 
@@ -338,23 +354,24 @@ async function fetchAnalytics() {
 setInterval(fetchAnalytics, 5000);
 fetchAnalytics();
 
-
 function updateAnalytics(data) {
-  // -------- Top ECU attacks --------
-  const ecuLabels = data.top_ecu_targets.map(x => x.ecu);
-  const ecuCounts = data.top_ecu_targets.map(x => x.count);
+  // Top ECUs
+  const ecuLabels = data.top_ecu_targets.map((x) => x.ecu);
+  const ecuCounts = data.top_ecu_targets.map((x) => x.count);
 
   if (!ecuChart) {
     ecuChart = new Chart(ecuChartCanvas, {
       type: "bar",
       data: {
         labels: ecuLabels,
-        datasets: [{
-          data: ecuCounts,
-          backgroundColor: "rgba(59,130,246,0.8)"
-        }]
+        datasets: [
+          {
+            data: ecuCounts,
+            backgroundColor: "rgba(59,130,246,0.8)",
+          },
+        ],
       },
-      options: { plugins:{legend:{display:false}} }
+      options: { plugins: { legend: { display: false } } },
     });
   } else {
     ecuChart.data.labels = ecuLabels;
@@ -362,21 +379,23 @@ function updateAnalytics(data) {
     ecuChart.update();
   }
 
-  // -------- Attack Types --------
-  const typeLabels = data.top_attack_types.map(x => x.type);
-  const typeCounts = data.top_attack_types.map(x => x.count);
+  // Attack types
+  const typeLabels = data.top_attack_types.map((x) => x.type);
+  const typeCounts = data.top_attack_types.map((x) => x.count);
 
   if (!typeChart) {
     typeChart = new Chart(typeChartCanvas, {
       type: "bar",
       data: {
         labels: typeLabels,
-        datasets: [{
-          data: typeCounts,
-          backgroundColor: "rgba(248,113,113,0.8)"
-        }]
+        datasets: [
+          {
+            data: typeCounts,
+            backgroundColor: "rgba(248,113,113,0.8)",
+          },
+        ],
       },
-      options: { plugins:{legend:{display:false}} }
+      options: { plugins: { legend: { display: false } } },
     });
   } else {
     typeChart.data.labels = typeLabels;
@@ -384,11 +403,11 @@ function updateAnalytics(data) {
     typeChart.update();
   }
 
-  // -------- Timeline Alerts --------
-  const timeline = data.events_timeline;
-  const timeLabels = timeline.map(x => x.timestamp);
-  const totalAlerts = timeline.map(x => x.total_alerts);
-  const criticalAlerts = timeline.map(x => x.critical_alerts);
+  // Events timeline
+  const timeline = data.events_timeline || [];
+  const timeLabels = timeline.map((x) => x.timestamp);
+  const totalAlerts = timeline.map((x) => x.total_alerts);
+  const criticalAlerts = timeline.map((x) => x.critical_alerts);
 
   if (!eventsChart) {
     eventsChart = new Chart(eventsChartCanvas, {
@@ -401,17 +420,17 @@ function updateAnalytics(data) {
             data: totalAlerts,
             borderColor: "rgba(59,130,246)",
             backgroundColor: "rgba(59,130,246,0.2)",
-            tension: 0.3
+            tension: 0.3,
           },
           {
-            label: "Critical/High",
+            label: "Critical / High",
             data: criticalAlerts,
             borderColor: "rgba(248,113,113)",
             backgroundColor: "rgba(248,113,113,0.2)",
-            tension: 0.3
-          }
-        ]
-      }
+            tension: 0.3,
+          },
+        ],
+      },
     });
   } else {
     eventsChart.data.labels = timeLabels;
@@ -420,14 +439,11 @@ function updateAnalytics(data) {
     eventsChart.update();
   }
 
-  // -------- Attackers Table --------
+  // Attackers table
   attackersTableBody.innerHTML = "";
-  data.top_attackers.forEach(row => {
+  (data.top_attackers || []).forEach((row) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${row.attacker}</td>
-      <td>${row.count}</td>
-    `;
+    tr.innerHTML = `<td>${row.attacker}</td><td>${row.count}</td>`;
     attackersTableBody.appendChild(tr);
   });
 }

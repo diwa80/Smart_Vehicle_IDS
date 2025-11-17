@@ -6,146 +6,164 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
-  <div id="app" class="dashboard">
-    <header class="dashboard-header">
-      <div>
-        <h1>Smart Vehicle Intrusion Detection Dashboard</h1>
-        <p class="subtitle">Real-time telemetry &amp; analytics for in-vehicle network security (simulated)</p>
+<div id="app" class="dashboard">
+
+  <header class="dashboard-header">
+    <h1>Smart Vehicle Intrusion Detection Dashboard</h1>
+    <p class="subtitle">Real-time telemetry, anomalies & attack simulation</p>
+
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      <span id="system-status-text">Starting…</span>
+    </div>
+  </header>
+
+  <!-- ATTACK SCENARIOS (ONLY NEW PART) -->
+  <section class="card full-width">
+    <h2>Attack Scenarios</h2>
+
+    <div class="attack-buttons">
+      <button class="attack-btn" data-attack="flood">CAN Bus Flooding</button>
+      <button class="attack-btn" data-attack="gps_spoof">GPS Spoofing</button>
+      <button class="attack-btn" data-attack="lane_spoof">Lane Camera Spoof</button>
+      <button class="attack-btn" data-attack="brake_spoof">Brake Spoofing</button>
+      <button class="attack-btn" data-attack="ecu_replay">ECU Replay Attack</button>
+      <button class="attack-btn" data-attack="sensor_manip">Sensor Manipulation</button>
+    </div>
+
+    <button id="attack-toggle-btn" class="btn-secondary">Stop All Attacks</button>
+  </section>
+
+  <!-- MAIN GRID -->
+  <main class="dashboard-main">
+
+    <!-- TELEMETRY (RESTORED UI) -->
+    <section class="card large">
+      <h2>Vehicle Telemetry</h2>
+
+      <div class="telemetry-box">
+        <div class="telemetry-item">
+          <span class="telemetry-label">Speed</span>
+          <span class="telemetry-value" id="speed-value">--</span>
+          <span class="telemetry-unit">km/h</span>
+        </div>
+
+        <div class="telemetry-item">
+          <span class="telemetry-label">Brake Status</span>
+          <span class="telemetry-value" id="brake-status">--</span>
+        </div>
+
+        <div class="telemetry-item">
+          <span class="telemetry-label">CAN Anomaly Score</span>
+          <span class="telemetry-value" id="anomaly-score">--</span>
+
+          <div class="telemetry-bar">
+            <div class="telemetry-bar-fill" id="anomaly-bar-fill"></div>
+          </div>
+        </div>
+
+        <div class="telemetry-item">
+          <span class="telemetry-label">Last Update</span>
+          <span class="telemetry-value small" id="last-update">--</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ECU HEALTH (RESTORED) -->
+    <section class="card">
+      <h2>ECU Health</h2>
+      <div id="ecu-health-list" class="ecu-list"></div>
+    </section>
+
+    <!-- HEATMAP (RESTORED) -->
+    <section class="card">
+      <h2>Attack Heatmap</h2>
+      <div id="heatmap-grid" class="heatmap-grid"></div>
+
+      <p class="heatmap-legend">
+        <span class="legend-box ok"></span> Healthy
+        <span class="legend-box warning"></span> Warning
+        <span class="legend-box compromised"></span> Compromised
+      </p>
+    </section>
+
+    <!-- CAN BUS TABLE (RESTORED UI) -->
+    <section class="card full-width">
+      <div class="card-header-row">
+        <h2>CAN Bus Live Signals</h2>
+        <span id="can-rate" class="can-rate-badge">-- signals/s</span>
       </div>
 
-      <button id="attack-toggle-btn" class="btn-secondary">Simulate Attack</button>
-
-      <div class="status-pill">
-        <span class="status-dot"></span>
-        <span id="system-status-text">Polling…</span>
+      <div class="can-table-wrapper">
+        <table class="can-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>ECU</th>
+              <th>Signal</th>
+              <th>Value</th>
+              <th>Anomaly</th>
+            </tr>
+          </thead>
+          <tbody id="can-table-body"></tbody>
+        </table>
       </div>
-    </header>
+    </section>
 
-    <main class="dashboard-main">
-      <!-- Telemetry -->
-      <section class="card large">
-        <h2>Vehicle Telemetry</h2>
-        <div class="telemetry-grid">
-          <div class="telemetry-item">
-            <span class="label">Speed</span>
-            <span class="value" id="speed-value">--</span>
-            <span class="unit">km/h</span>
-          </div>
+    <!-- TIMELINE (RESTORED UI) -->
+    <section class="card full-width">
+      <h2>Realtime Anomaly Timeline</h2>
+      <div class="timeline-container">
+        <canvas id="attackTimelineChart"></canvas>
+      </div>
+    </section>
 
-          <div class="telemetry-item">
-            <span class="label">Brake Status</span>
-            <span class="value brake" id="brake-status">--</span>
-          </div>
+    <!-- ANALYTICS (RESTORED UI) -->
+    <section class="card full-width">
+      <h2>Analytics Overview</h2>
 
-          <div class="telemetry-item">
-            <span class="label">CAN Anomaly Score</span>
-            <span class="value" id="anomaly-score">--</span>
-            <div class="anomaly-bar">
-              <div class="anomaly-bar-fill" id="anomaly-bar-fill"></div>
-            </div>
-          </div>
-
-          <div class="telemetry-item">
-            <span class="label">Last Update (UTC)</span>
-            <span class="value small" id="last-update">--</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ECU Health & Heatmap -->
-      <section class="card">
-        <h2>ECU Health</h2>
-        <div id="ecu-health-list" class="ecu-list"></div>
-      </section>
-
-      <section class="card">
-        <h2>Attack Heatmap</h2>
-        <div class="heatmap-grid" id="heatmap-grid"></div>
-        <p class="heatmap-legend">
-          <span class="legend-box ok"></span> Healthy
-          <span class="legend-box warning"></span> Warning
-          <span class="legend-box compromised"></span> Compromised
-        </p>
-      </section>
-
-      <!-- CAN Packets -->
-      <section class="card full-width">
-        <div class="card-header-row">
-          <h2>CAN Bus Live Packets</h2>
-          <span class="can-rate-badge" id="can-rate">-- frames/s</span>
-        </div>
-        <div class="can-table-wrapper">
-          <table class="can-table">
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>ID</th>
-                <th>ECU</th>
-                <th>DLC</th>
-                <th>Data</th>
-                <th>Anomaly</th>
-              </tr>
-            </thead>
-            <tbody id="can-table-body"></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Timeline -->
-      <section class="card full-width">
-        <h2>Realtime Anomaly Timeline</h2>
-        <canvas id="attackTimelineChart" height="100"></canvas>
-        <p class="timeline-caption">
-          Recent anomaly score (line) and attack periods (red shaded background).
-        </p>
-      </section>
-
-      <!-- Analytics -->
-      <section class="card full-width">
-        <h2>Analytics Overview</h2>
-        <div class="analytics-grid">
-          <div class="analytics-card">
-            <h3>Top ECUs Targeted</h3>
-            <canvas id="ecu-chart" height="160"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Top Attack Types</h3>
-            <canvas id="type-chart" height="160"></canvas>
-          </div>
-          <div class="analytics-card">
-            <h3>Alert Volume Over Time</h3>
-            <canvas id="events-chart" height="160"></canvas>
-          </div>
+      <div class="analytics-grid">
+        <div class="analytics-card">
+          <h3>Top ECUs Targeted</h3>
+          <canvas id="ecu-chart" height="140"></canvas>
         </div>
 
-        <div class="analytics-attackers">
-          <h3>Top Attackers</h3>
-          <table class="attackers-table">
-            <thead>
-              <tr>
-                <th>Attacker (IP)</th>
-                <th>Attack Count</th>
-              </tr>
-            </thead>
-            <tbody id="attackers-table-body"></tbody>
-          </table>
+        <div class="analytics-card">
+          <h3>Attack Types</h3>
+          <canvas id="type-chart" height="140"></canvas>
         </div>
-      </section>
 
-      <!-- Alerts -->
-      <section class="card full-width">
+        <div class="analytics-card">
+          <h3>Alert Volume</h3>
+          <canvas id="events-chart" height="140"></canvas>
+        </div>
+      </div>
+
+      <h3 style="margin-top:12px;">Top Attackers</h3>
+      <table class="attackers-table">
+        <thead>
+        <tr><th>IP Address</th><th>Count</th></tr>
+        </thead>
+        <tbody id="attackers-table-body"></tbody>
+      </table>
+    </section>
+
+    <!-- ALERTS (RESTORED UI) -->
+    <section class="card full-width">
         <div class="card-header-row">
           <h2>Security Alerts</h2>
           <button id="clear-alerts-btn" class="btn-secondary">Clear Alerts</button>
         </div>
         <div id="alerts-list" class="alerts-list"></div>
       </section>
-    </main>
-  </div>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="app.js"></script>
+  </main>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
