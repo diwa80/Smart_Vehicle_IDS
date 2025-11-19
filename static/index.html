@@ -161,6 +161,28 @@
 
   </main>
 
+  <!-- Floating Feedback Button -->
+<button id="feedback-btn" class="feedback-button">Feedback</button>
+
+<!-- Feedback Modal -->
+<div id="feedback-modal" class="feedback-modal">
+  <div class="feedback-modal-content">
+
+    <h3>Feedback</h3>
+
+    <!-- QR Code Image (Replace feedback_qr.png with your file) -->
+    <img id="feedback-qr" src="qr.jpg" alt="QR Code" class="qr-image">
+
+    <p>Scan the QR code or use the link below:</p>
+    <p><a class="fdbck"href="https://docs.google.com/forms/d/e/1FAIpQLSeeU_G6jqhzFyAYDV9ckDoh464ds4ryz1yjo6jQInvZ01ycyg/viewform?usp=dialog">
+    CLICK HERE FOR FEEDBACK FORM</a>
+  </p>
+    <button id="close-feedback" class="modal-btn cancel">Close</button>
+  </div>
+</div>
+
+<!-- Popup Alerts Container -->
+<div id="popup-alert-container" style="position: fixed; top: 20px; right: 20px; width: 320px; z-index: 999999;"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
