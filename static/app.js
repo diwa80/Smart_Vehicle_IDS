@@ -16,6 +16,7 @@ const heatmapGridEl = document.getElementById("heatmap-grid");
 // Alerts
 const alertsListEl = document.getElementById("alerts-list");
 const clearAlertsBtn = document.getElementById("clear-alerts-btn");
+const showAllAlertsBtn = document.getElementById("show-all-alerts-btn");
 
 // Attack Controls
 const attackButtons = document.querySelectorAll(".attack-btn");
@@ -39,6 +40,25 @@ const rootEl = document.getElementById("app");
 // State
 let alertHistory = [];
 let currentAttackMode = null;
+
+// Load alerts from localStorage on startup
+function loadAlertsFromStorage() {
+  const stored = localStorage.getItem("alertHistory");
+  if (stored) {
+    try {
+      alertHistory = JSON.parse(stored);
+      renderAlerts();
+    } catch (e) {
+      console.error("Error loading alerts:", e);
+      alertHistory = [];
+    }
+  }
+}
+
+// Save alerts to localStorage
+function saveAlertsToStorage() {
+  localStorage.setItem("alertHistory", JSON.stringify(alertHistory));
+}
 
 // ⭐ POPUPS ONLY WHEN MANUAL ATTACK ENABLED
 let alertsEnabled = false;
@@ -163,7 +183,9 @@ function addAlerts(alerts) {
     });
   });
 
-  alertHistory = alertHistory.slice(0, 50);
+  alertHistory = alertHistory.slice(0, 500); // Increased limit for all alerts page
+  saveAlertsToStorage();
+    console.log("Saved", alertHistory.length, "alerts to localStorage");
   renderAlerts();
 }
 
@@ -193,7 +215,12 @@ function renderAlerts() {
 
 clearAlertsBtn.onclick = () => {
   alertHistory = [];
+  localStorage.removeItem("alertHistory");
   renderAlerts();
+};
+
+showAllAlertsBtn.onclick = () => {
+  window.location.href = "alerts.html";
 };
 
 
@@ -412,6 +439,7 @@ function updateAnalytics(data) {
     tr.innerHTML = `
       <td>${a.attacker}</td>
       <td>${a.count}</td>
+      <td><button class="btn-view-details" onclick="fetchIPDetails('${a.attacker}')">View Details</button></td>
     `;
     attackersTableBody.appendChild(tr);
   });
@@ -475,13 +503,18 @@ function showPopupAlert(level, message) {
 
   const container = document.getElementById("popup-alert-container");
   const div = document.createElement("div");
+  const timestamp = new Date().toLocaleTimeString("en-US", { hour12: true });
 
   div.className = "popup-alert";
   if (level === "CRITICAL") div.classList.add("popup-critical");
   if (level === "HIGH") div.classList.add("popup-high");
 
   div.innerHTML = `
-    <strong>${level}</strong><br>${message}
+    <div class="popup-header">
+      <strong>${level}</strong>
+      <span class="popup-timestamp">${timestamp}</span>
+    </div>
+    <div class="popup-message">${message}</div>
     <button class="alert-close">&times;</button>
   `;
 
@@ -501,7 +534,98 @@ function showPopupAlert(level, message) {
 }
 
 
+/* ===========================================================
+   FETCH IP DETAILS FROM IP-API.COM
+=========================================================== */
+
+async function fetchIPDetails(ip) {
+  const modal = document.getElementById("ip-details-modal");
+  const content = document.getElementById("ip-details-content");
+  const title = document.getElementById("modal-ip-title");
+
+  title.textContent = `IP Details: ${ip}`;
+  content.innerHTML = '<div class="loading">Loading IP details...</div>';
+  modal.style.display = "flex";
+
+  try {
+    const response = await fetch(`/api/ip-details/${ip}`);
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      content.innerHTML = `<div class="error">Error: ${data.error || "Failed to fetch IP details"}</div>`;
+      return;
+    }
+
+    const details = `
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">IP Address</div>
+        <div class="ip-detail-value">${data.query || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Country</div>
+        <div class="ip-detail-value">${data.country || "N/A"} (${data.countryCode || "N/A"})</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Region</div>
+        <div class="ip-detail-value">${data.regionName || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">City</div>
+        <div class="ip-detail-value">${data.city || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Timezone</div>
+        <div class="ip-detail-value">${data.timezone || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Coordinates</div>
+        <div class="ip-detail-value">${data.lat || "N/A"}, ${data.lon || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">ISP</div>
+        <div class="ip-detail-value">${data.isp || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Organization</div>
+        <div class="ip-detail-value">${data.org || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">ASN</div>
+        <div class="ip-detail-value">${data.as || "N/A"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Mobile</div>
+        <div class="ip-detail-value">${data.mobile ? "Yes" : "No"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Proxy</div>
+        <div class="ip-detail-value">${data.proxy ? "Yes" : "No"}</div>
+      </div>
+      <div class="ip-detail-item">
+        <div class="ip-detail-label">Hosting</div>
+        <div class="ip-detail-value">${data.hosting ? "Yes" : "No"}</div>
+      </div>
+    `;
+
+    content.innerHTML = details;
+  } catch (error) {
+    console.error("Error fetching IP details:", error);
+    content.innerHTML = `<div class="error">Error fetching IP details. Please try again later.</div>`;
+  }
+}
+
+// Close modal on background click
+document.addEventListener("click", (e) => {
+  const modal = document.getElementById("ip-details-modal");
+  if (e.target === modal) {
+    modal.style.display = "none";
+  }
+});
+
 // Feedback
+
+// Load alerts on page load
+loadAlertsFromStorage();
 
 // OPEN FEEDBACK MODAL
 document.getElementById("feedback-btn").onclick = () => {

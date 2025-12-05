@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime
 from collections import Counter
+import requests
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -466,6 +467,30 @@ def get_analytics():
                           for k, v in ANALYTICS["attack_counts_by_attacker"].most_common(5)],
         "events_timeline": ANALYTICS["events_timeline"],
     })
+
+
+@app.route("/api/ip-details/<ip>", methods=["GET"])
+def get_ip_details(ip):
+    """Fetch IP geolocation details from ip-api.com"""
+    try:
+        # Use HTTP endpoint to avoid SSL issues
+        response = requests.get(
+            f"http://ip-api.com/json/{ip}",
+            params={
+                "fields": "status,message,continent,continentCode,country,countryCode,region,regionName,city,district,zip,lat,lon,timezone,offset,currency,isp,org,as,asname,mobile,proxy,hosting,query"
+            },
+            timeout=5
+        )
+        data = response.json()
+        
+        if data.get("status") == "fail":
+            return jsonify({"error": data.get("message", "Failed to fetch IP details")}), 400
+        
+        return jsonify(data)
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Failed to fetch IP details: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

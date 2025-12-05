@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>All Security Alerts - Smart Vehicle IDS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body {
+      background: #0f172a;
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .alerts-page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .alerts-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #374151;
+    }
+
+    .alerts-header h1 {
+      margin: 0;
+      font-size: 28px;
+      color: #f3f4f6;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .back-btn {
+      padding: 10px 20px;
+      background: #374151;
+      color: #f3f4f6;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .back-btn:hover {
+      background: #4b5563;
+    }
+
+    .btn-secondary {
+      padding: 10px 20px;
+      background: #374151;
+      color: #f3f4f6;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: #4b5563;
+    }
+
+    .filter-section {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: #1f2937;
+      padding: 20px;
+      border-radius: 8px;
+    }
+
+    .filter-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .filter-group label {
+      color: #d1d5db;
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    .filter-select {
+      padding: 10px 14px;
+      background: #111827;
+      color: #f3f4f6;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      flex: 1;
+      min-width: 150px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .filter-select:hover {
+      border-color: #6b7280;
+      background: #1f2937;
+    }
+
+    .filter-select:focus {
+      outline: none;
+      border-color: #3b82f6;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #1f2937;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #3b82f6;
+    }
+
+    .stat-card.critical {
+      border-left-color: #dc2626;
+    }
+
+    .stat-card.warning {
+      border-left-color: #f59e0b;
+    }
+
+    .stat-card.info {
+      border-left-color: #3b82f6;
+    }
+
+    .stat-label {
+      color: #9ca3af;
+      font-size: 12px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .stat-value {
+      color: #f3f4f6;
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .alerts-container {
+      background: #1f2937;
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .alert-item-full {
+      background: #111827;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      padding: 15px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .alert-item-full:hover {
+      transform: translateX(5px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .alert-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .alert-meta {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .alert-source-full {
+      font-weight: 600;
+      color: #60a5fa;
+      font-size: 14px;
+    }
+
+    .alert-message-full {
+      color: #d1d5db;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .alert-time-full {
+      color: #6b7280;
+      font-size: 13px;
+    }
+
+    .no-alerts {
+      text-align: center;
+      color: #9ca3af;
+      padding: 40px;
+      font-size: 16px;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .page-btn {
+      padding: 8px 16px;
+      background: #374151;
+      color: #f3f4f6;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: #4b5563;
+    }
+
+    .page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .page-info {
+      color: #9ca3af;
+      font-size: 14px;
+    }
+
+      /* Alert Badge Styles */
+      .alert-badge {
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .alert-badge.CRITICAL,
+      .alert-badge.critical {
+        background: rgba(220, 38, 38, 0.2);
+        color: #fca5a5;
+        border: 1px solid #dc2626;
+      }
+
+      .alert-badge.HIGH,
+      .alert-badge.high {
+        background: rgba(245, 158, 11, 0.2);
+        color: #fbbf24;
+        border: 1px solid #f59e0b;
+      }
+
+      .alert-badge.MEDIUM,
+      .alert-badge.medium,
+      .alert-badge.WARNING,
+      .alert-badge.warning {
+        background: rgba(234, 179, 8, 0.2);
+        color: #fde047;
+        border: 1px solid #eab308;
+      }
+
+      .alert-badge.LOW,
+      .alert-badge.low,
+      .alert-badge.INFO,
+      .alert-badge.info {
+        background: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+        border: 1px solid #3b82f6;
+      }
+  </style>
+</head>
+
+<body>
+<div class="alerts-page">
+
+  <div class="alerts-header">
+    <h1>All Security Alerts</h1>
+    <div class="header-actions">
+      <button id="export-alerts-btn" class="btn-secondary">Export Alerts</button>
+      <button id="clear-all-btn" class="btn-secondary">Clear All Alerts</button>
+      <button id="back-btn" class="back-btn">← Back to Dashboard</button>
+    </div>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card critical">
+      <div class="stat-label">Critical Alerts</div>
+      <div class="stat-value" id="critical-count">0</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-label">Warning Alerts</div>
+      <div class="stat-value" id="warning-count">0</div>
+    </div>
+    <div class="stat-card info">
+      <div class="stat-label">Info Alerts</div>
+      <div class="stat-value" id="info-count">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Alerts</div>
+      <div class="stat-value" id="total-count">0</div>
+    </div>
+  </div>
+
+  <div class="filter-section">
+    <div class="filter-group">
+      <label for="level-filter">Filter by Level:</label>
+      <select id="level-filter" class="filter-select">
+        <option value="all">All Levels</option>
+        <option value="critical">Critical</option>
+          <option value="high">High</option>
+        <option value="warning">Warning</option>
+        <option value="info">Info</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="source-filter">Filter by Source:</label>
+      <select id="source-filter" class="filter-select">
+        <option value="all">All Sources</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label for="sort-filter">Sort by:</label>
+      <select id="sort-filter" class="filter-select">
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="level">By Severity</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="alerts-container">
+    <div id="alerts-list-full"></div>
+    
+    <div class="pagination">
+      <button id="prev-page" class="page-btn">Previous</button>
+      <span class="page-info" id="page-info">Page 1 of 1</span>
+      <button id="next-page" class="page-btn">Next</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="alerts.js"></script>
+</body>
+</html>
